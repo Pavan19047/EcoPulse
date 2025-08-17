@@ -2,15 +2,16 @@
 
 import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TrendingUp, Search, Filter, Globe } from "lucide-react"
 import ForecastCard from "./forecast-card"
+import { Button } from "@/components/ui/button"
 import RiskMap from "./risk-map"
 import ClimateChart from "./climate-chart"
 import { cn } from "@/lib/utils"
+import GenerateForecastModal from "../GenerateForecastModal" // <-- 1. Import the modal
 
 interface ForecastingDashboardProps {
   forecasts: any[]
@@ -22,10 +23,33 @@ export default function ForecastingDashboard({ forecasts, climateData, riskStats
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedRisk, setSelectedRisk] = useState<string>("all")
   const [selectedDisease, setSelectedDisease] = useState<string>("all")
+  const [isModalOpen, setIsModalOpen] = useState(false); // <-- 2. Add state for the modal
+  const [localForecasts, setLocalForecasts] = useState<any[]>(forecasts)
+  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set())
+
+  const toggleSelected = (id: string | number, checked: boolean) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev); checked ? n.add(id) : n.delete(id); return n;
+    })
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const bulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} selected forecast(s)? This cannot be undone.`)) return;
+    const ids = Array.from(selectedIds);
+    await Promise.all(ids.map(id => fetch(`/api/forecasts/${id}`, { method: "DELETE" })))
+      .then(() => {
+        setLocalForecasts(prev => prev.filter(f => !selectedIds.has(f.id)))
+        clearSelection()
+      })
+      .catch(() => {/* optional: toast handled per-item if desired */})
+  }
 
   // Filter forecasts based on search and filters
   const filteredForecasts = useMemo(() => {
-    return forecasts.filter((forecast) => {
+    return localForecasts.filter((forecast) => {
       const matchesSearch =
         forecast.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
         forecast.diseases?.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -35,15 +59,21 @@ export default function ForecastingDashboard({ forecasts, climateData, riskStats
 
       return matchesSearch && matchesRisk && matchesDisease
     })
-  }, [forecasts, searchTerm, selectedRisk, selectedDisease])
+  }, [localForecasts, searchTerm, selectedRisk, selectedDisease])
 
-  // Get unique diseases for filter
+  // Get unique diseases for filter and modal
   const uniqueDiseases = useMemo(() => {
-    const diseases = forecasts.map((f) => f.diseases?.name).filter(Boolean)
-    return [...new Set(diseases)]
-  }, [forecasts])
+    const diseaseMap = new Map();
+    localForecasts.forEach(f => {
+      if (f.diseases && !diseaseMap.has(f.diseases.id)) {
+        diseaseMap.set(f.diseases.id, f.diseases);
+      }
+    });
+    return Array.from(diseaseMap.values());
+  }, [localForecasts])
 
   const getRiskColor = (risk: string) => {
+    // ... (rest of the function is unchanged)
     switch (risk) {
       case "critical":
         return "bg-red-500"
@@ -58,20 +88,7 @@ export default function ForecastingDashboard({ forecasts, climateData, riskStats
     }
   }
 
-  const getRiskTextColor = (risk: string) => {
-    switch (risk) {
-      case "critical":
-        return "text-red-700 bg-red-50 border-red-200"
-      case "high":
-        return "text-orange-700 bg-orange-50 border-orange-200"
-      case "medium":
-        return "text-yellow-700 bg-yellow-50 border-yellow-200"
-      case "low":
-        return "text-green-700 bg-green-50 border-green-200"
-      default:
-        return "text-gray-700 bg-gray-50 border-gray-200"
-    }
-  }
+  // ... (rest of the component is mostly unchanged)
 
   return (
     <div className="space-y-6">
@@ -131,8 +148,8 @@ export default function ForecastingDashboard({ forecasts, climateData, riskStats
               <SelectContent>
                 <SelectItem value="all">All Diseases</SelectItem>
                 {uniqueDiseases.map((disease) => (
-                  <SelectItem key={disease} value={disease}>
-                    {disease}
+                  <SelectItem key={disease.id} value={disease.name}>
+                    {disease.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -152,7 +169,8 @@ export default function ForecastingDashboard({ forecasts, climateData, riskStats
         <TabsContent value="forecasts" className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Disease Forecasts ({filteredForecasts.length})</h3>
-            <Button variant="outline" size="sm">
+            {/* 3. Update the button to open the modal */}
+            <Button variant="outline" size="sm" onClick={() => setIsModalOpen(true)}>
               <TrendingUp className="mr-2 h-4 w-4" />
               Generate New Forecast
             </Button>
@@ -169,11 +187,36 @@ export default function ForecastingDashboard({ forecasts, climateData, riskStats
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {filteredForecasts.map((forecast) => (
-                <ForecastCard key={forecast.id} forecast={forecast} />
-              ))}
-            </div>
+            <>
+              {selectedIds.size > 0 && (
+                <div className="flex items-center justify-between p-3 border rounded-md mb-2 bg-muted/30">
+                  <div className="text-sm">{selectedIds.size} selected</div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={clearSelection}>Clear</Button>
+                    <Button variant="destructive" size="sm" onClick={bulkDelete}>Delete Selected</Button>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                {filteredForecasts.map((forecast) => (
+                  <div key={forecast.id ?? `${forecast.location}-${forecast.forecast_date}`} className="relative">
+                    <label className="absolute left-2 top-2 z-10 bg-white/90 rounded p-1 border flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(forecast.id)}
+                        onChange={(e) => toggleSelected(forecast.id, e.target.checked)}
+                        aria-label="Select forecast"
+                      />
+                      Select
+                    </label>
+                    <ForecastCard
+                      forecast={forecast}
+                      onDelete={(id) => setLocalForecasts((prev) => prev.filter((f) => String(f.id) !== String(id)))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </TabsContent>
 
@@ -185,6 +228,14 @@ export default function ForecastingDashboard({ forecasts, climateData, riskStats
           <ClimateChart climateData={climateData} />
         </TabsContent>
       </Tabs>
+      
+      {/* 4. Add the modal component to the JSX */}
+      <GenerateForecastModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        diseases={uniqueDiseases}
+        onCreated={(row) => setLocalForecasts((prev) => [row, ...prev])}
+      />
     </div>
   )
 }

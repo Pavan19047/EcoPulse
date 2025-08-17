@@ -3,7 +3,7 @@
 import type React from "react"
 import RealtimeProvider from "@/components/realtime/realtime-provider"
 
-import { useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -29,9 +29,10 @@ import {
   Database,
 } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { signOut } from "@/lib/auth-actions"
 import { cn } from "@/lib/utils"
+import { useNavigationProgress, useNavProgressOnPathChange } from "@/components/ui/top-loader"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
@@ -51,6 +52,9 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
+  const { start } = useNavigationProgress()
+  const router = useRouter()
+  useNavProgressOnPathChange()
 
   const NavItems = () => (
     <nav className="flex flex-col space-y-1">
@@ -60,11 +64,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <Link
             key={item.name}
             href={item.href}
+            prefetch={true}
             className={cn(
               "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors",
               isActive ? "bg-blue-600 text-white" : "text-gray-300 hover:bg-gray-700 hover:text-white",
             )}
-            onClick={() => setSidebarOpen(false)}
+            onMouseEnter={() => { try { router.prefetch(item.href) } catch {} }}
+            onFocus={() => { try { router.prefetch(item.href) } catch {} }}
+            onClick={() => { setSidebarOpen(false); if (!isActive) setTimeout(() => start(), 0) }}
           >
             <item.icon className="mr-3 h-5 w-5" />
             {item.name}
@@ -73,6 +80,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       })}
     </nav>
   )
+
+  function LoadFallback() {
+    const { start } = useNavigationProgress()
+    useEffect(() => { start() }, [start])
+    return null
+  }
+
+  function LoadDone({ children }: { children: React.ReactNode }) {
+    const { finish } = useNavigationProgress()
+    useEffect(() => { finish() }, [finish])
+    return <>{children}</>
+  }
 
   return (
     <RealtimeProvider>
@@ -176,7 +195,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Page content */}
           <main className="flex-1">
             <div className="py-6">
-              <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{children}</div>
+              <Suspense fallback={<LoadFallback />}>
+                <LoadDone>
+                  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{children}</div>
+                </LoadDone>
+              </Suspense>
             </div>
           </main>
         </div>

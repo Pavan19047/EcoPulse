@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Sparkles, FlaskConical, Target, Beaker } from "lucide-react"
+import { toast } from "sonner"
 
 export default function MoleculeGenerator() {
   const [isGenerating, setIsGenerating] = useState(false)
@@ -15,35 +16,34 @@ export default function MoleculeGenerator() {
   const [constraints, setConstraints] = useState("")
   const [generationMethod, setGenerationMethod] = useState("")
   const [results, setResults] = useState<any[]>([])
+  const [autoSave, setAutoSave] = useState(false)
 
   const handleGenerate = async () => {
-    setIsGenerating(true)
-
-    // Simulate AI generation process
-    setTimeout(() => {
-      const mockResults = [
-        {
-          id: 1,
-          name: "AI-Generated Compound 1",
-          smiles: "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
-          formula: "C14H20O2",
-          weight: 220.31,
-          score: 0.87,
-          confidence: 0.92,
-        },
-        {
-          id: 2,
-          name: "AI-Generated Compound 2",
-          smiles: "CC1=CC=C(C=C1)C(=O)NC2=CC=CC=C2",
-          formula: "C14H13NO",
-          weight: 211.26,
-          score: 0.79,
-          confidence: 0.85,
-        },
-      ]
-      setResults(mockResults)
+    try {
+      setIsGenerating(true)
+      setResults([])
+      const res = await fetch("/api/discovery/generate", {
+        method: "POST",
+        body: JSON.stringify({ targetDisease, constraints, method: generationMethod, save: autoSave }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      const data = await res.json()
+      const view = (data.compounds || []).map((c: any, i: number) => ({
+        id: i + 1,
+        name: c.name,
+        smiles: c.smiles,
+        formula: c.molecular_formula,
+        weight: c.molecular_weight,
+        score: c.score,
+        confidence: c.confidence,
+      }))
+      setResults(view)
+      if (autoSave) toast.success(`Saved ${data.saved?.length || 0} molecules to library`)
+    } catch (e: any) {
+      toast.error(e?.message || "Generation failed")
+    } finally {
       setIsGenerating(false)
-    }, 3000)
+    }
   }
 
   return (
@@ -99,6 +99,18 @@ export default function MoleculeGenerator() {
               onChange={(e) => setConstraints(e.target.value)}
               rows={3}
             />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={autoSave}
+                onChange={(e) => setAutoSave(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Save generated molecules to library
+            </label>
           </div>
 
           <Button
@@ -178,7 +190,19 @@ export default function MoleculeGenerator() {
                       <Target className="mr-2 h-3 w-3" />
                       Evaluate
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={async () => {
+                      try {
+                        const res = await fetch("/api/discovery/generate", {
+                          method: "POST",
+                          body: JSON.stringify({ targetDisease, constraints, method: generationMethod, save: true }),
+                        })
+                        if (!res.ok) throw new Error(await res.text())
+                        const data = await res.json()
+                        toast.success(`Saved ${data.saved?.length || 0} molecules to library`)
+                      } catch (e: any) {
+                        toast.error(e?.message || "Save failed")
+                      }
+                    }}>
                       <Beaker className="mr-2 h-3 w-3" />
                       Add to Library
                     </Button>

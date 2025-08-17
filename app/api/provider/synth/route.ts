@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server"
+export async function POST() { return NextResponse.json({ route: [ { step: 1, action: "Esterification", detail: "Form salicylic acid ester" }, { step: 2, action: "Acetylation", detail: "Introduce acetyl group" } ], conditions: [ { step: 1, reagent: "H2SO4", solvent: "EtOH", tempC: 60, timeH: 4 }, { step: 2, reagent: "Ac2O", solvent: "Pyridine", tempC: 25, timeH: 2 } ] }) }

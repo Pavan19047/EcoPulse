@@ -1,21 +1,24 @@
 "use client"
 
+import "maplibre-gl/dist/maplibre-gl.css"
+import dynamic from "next/dynamic"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Map, Globe } from "lucide-react"
+import { Map } from "lucide-react"
+import { MapboxOverlay } from "@/components/map/MapboxOverlay"
+
+const ReactMapGL = dynamic(() => import("react-map-gl/maplibre").then((m) => m.default), { ssr: false })
 
 interface RiskMapProps {
   forecasts: any[]
 }
 
 export default function RiskMap({ forecasts }: RiskMapProps) {
-  // Group forecasts by location for the map view
+  // Group forecasts by location for the summary below the map
   const locationGroups = forecasts.reduce(
     (acc, forecast) => {
       const location = forecast.location
-      if (!acc[location]) {
-        acc[location] = []
-      }
+      if (!acc[location]) acc[location] = []
       acc[location].push(forecast)
       return acc
     },
@@ -37,14 +40,19 @@ export default function RiskMap({ forecasts }: RiskMapProps) {
     }
   }
 
-  const getHighestRisk = (forecasts: any[]) => {
+  const getHighestRisk = (arr: any[]) => {
     const riskLevels = { critical: 4, high: 3, medium: 2, low: 1 }
-    return forecasts.reduce((highest, forecast) => {
-      const currentLevel = riskLevels[forecast.risk_level as keyof typeof riskLevels] || 0
-      const highestLevel = riskLevels[highest as keyof typeof riskLevels] || 0
-      return currentLevel > highestLevel ? forecast.risk_level : highest
+    return arr.reduce((highest, f) => {
+      const cl = riskLevels[f.risk_level as keyof typeof riskLevels] || 0
+      const hl = riskLevels[highest as keyof typeof riskLevels] || 0
+      return cl > hl ? f.risk_level : highest
     }, "low")
   }
+
+  const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY
+  const mapStyle = maptilerKey
+    ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`
+    : undefined
 
   return (
     <div className="space-y-6">
@@ -57,17 +65,21 @@ export default function RiskMap({ forecasts }: RiskMapProps) {
           <CardDescription>Interactive visualization of disease outbreak risks worldwide</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Placeholder for actual map implementation */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-8 text-center">
-            <Globe className="mx-auto h-16 w-16 text-blue-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Interactive Map Coming Soon</h3>
-            <p className="text-gray-600 mb-4">
-              This will display an interactive world map with risk indicators and real-time data visualization.
-            </p>
-            <p className="text-sm text-gray-500">
-              Integration with mapping services like Mapbox or Google Maps will be implemented in the next phase.
-            </p>
-          </div>
+          {!mapStyle ? (
+            <div className="bg-blue-50 rounded-lg p-6 text-center text-blue-800">
+              Set NEXT_PUBLIC_MAPTILER_KEY in .env.local to enable the map.
+            </div>
+          ) : (
+            <div className="rounded-lg overflow-hidden border">
+              <ReactMapGL
+                initialViewState={{ latitude: 20, longitude: 0, zoom: 1.5 }}
+                mapStyle={mapStyle}
+                style={{ width: "100%", height: 420 }}
+              >
+                <MapboxOverlay forecasts={forecasts} showRiskLayer={true} />
+              </ReactMapGL>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -79,9 +91,9 @@ export default function RiskMap({ forecasts }: RiskMapProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {Object.entries(locationGroups).map(([location, locationForecasts]) => {
+            {(Object.entries(locationGroups) as Array<[string, any[]]>).map(([location, locationForecasts]) => {
               const highestRisk = getHighestRisk(locationForecasts)
-              const totalCases = locationForecasts.reduce((sum, f) => sum + (f.predicted_cases || 0), 0)
+              const totalCases = locationForecasts.reduce((sum: number, f: any) => sum + (f.predicted_cases || 0), 0)
 
               return (
                 <div key={location} className="flex items-center justify-between p-4 border rounded-lg">

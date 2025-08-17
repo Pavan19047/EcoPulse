@@ -29,15 +29,28 @@ export async function middleware(request: NextRequest) {
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user: any = null
+  try {
+    // Race Supabase auth check with a short timeout to avoid blocking client navigations.
+    const userOrNull = await Promise.race([
+      supabase
+        .auth
+        .getUser()
+        .then((res) => res?.data?.user ?? null)
+        .catch(() => null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 800)),
+    ])
+    user = userOrNull
+  } catch {
+    // Ignore network errors in middleware; pages will enforce auth as needed.
+    user = null
+  }
 
   // Protected routes - redirect to login if not authenticated
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth")
   const isPublicRoute = request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/public")
 
-  if (!user && !isAuthRoute && !isPublicRoute) {
+  if (!user && !isAuthRoute && !isPublicRoute && request.nextUrl.pathname.startsWith("/dashboard")) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = "/auth/login"
@@ -64,6 +77,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * Feel free to modify this pattern to include more paths.
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }

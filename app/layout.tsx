@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
+import { Toaster } from "sonner"
+import { NavigationProgressProvider } from "@/components/ui/top-loader"
+import RouterProgressListener from "@/components/ui/router-progress-listener"
 
 export const metadata: Metadata = {
   title: 'v0 App',
@@ -25,7 +28,13 @@ html {
 }
         `}</style>
       </head>
-      <body>{children}</body>
+      <body>
+        <NavigationProgressProvider>
+          <RouterProgressListener />
+          {children}
+          <Toaster richColors position="top-right" />
+        </NavigationProgressProvider>
+      </body>
     </html>
   )
 }

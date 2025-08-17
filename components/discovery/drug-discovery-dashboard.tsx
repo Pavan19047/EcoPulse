@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FlaskConical, Search, Filter, Plus, TrendingUp, Microscope, Beaker } from "lucide-react"
+import { FlaskConical, Search, Filter, Plus, TrendingUp, Microscope, Beaker, Atom, Dna, ShieldAlert, Wrench, MessageSquare } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
 import MoleculeCard from "./molecule-card"
 import EvaluationChart from "./evaluation-chart"
 import MoleculeGenerator from "./molecule-generator"
@@ -191,10 +192,11 @@ export default function DrugDiscoveryDashboard({
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="molecules" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="molecules">Molecule Library</TabsTrigger>
           <TabsTrigger value="evaluations">Evaluations</TabsTrigger>
           <TabsTrigger value="generator">AI Generator</TabsTrigger>
+          <TabsTrigger value="agent">AI Agent</TabsTrigger>
         </TabsList>
 
         <TabsContent value="molecules" className="space-y-4">
@@ -232,7 +234,206 @@ export default function DrugDiscoveryDashboard({
         <TabsContent value="generator" className="space-y-4">
           <MoleculeGenerator />
         </TabsContent>
+
+        {/* AI Agent: identify + predict interactions + toxicity + synthesis + explain + feedback */}
+        <TabsContent value="agent" className="space-y-4">
+          <AIAgentPanel />
+        </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+function AIAgentPanel() {
+  const [query, setQuery] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [identified, setIdentified] = useState<any | null>(null)
+  const [interactions, setInteractions] = useState<any[] | null>(null)
+  const [toxicity, setToxicity] = useState<any | null>(null)
+  const [synthesis, setSynthesis] = useState<any | null>(null)
+  const [explain, setExplain] = useState<any | null>(null)
+  const [rating, setRating] = useState<number>(3)
+  const [comments, setComments] = useState<string>("")
+
+  async function call(path: string, body: any) {
+    const res = await fetch(path, { method: "POST", body: JSON.stringify(body) })
+    if (!res.ok) throw new Error(await res.text())
+    return res.json()
+  }
+
+  async function runAll() {
+    setBusy(true)
+    setInteractions(null)
+    setToxicity(null)
+    setSynthesis(null)
+    setExplain(null)
+    try {
+      const idRes = await call("/api/discovery/identify", { query })
+      setIdentified(idRes.molecule)
+      const mol = idRes.molecule
+      const [pi, tox, syn, exp] = await Promise.all([
+        call("/api/discovery/predict-interactions", { molecule: mol }),
+        call("/api/discovery/toxicity", { molecule: mol }),
+        call("/api/discovery/synthesis", { molecule: mol }),
+        call("/api/discovery/explain", { molecule: mol, task: "prediction" }),
+      ])
+      setInteractions(pi.interactions)
+      setToxicity(tox.toxicity)
+      setSynthesis({ route: syn.route, conditions: syn.conditions })
+      setExplain(exp.explanation)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function sendFeedback() {
+    try {
+      await call("/api/discovery/feedback", { molecule: identified?.name || identified?.smiles || query, rating, comments })
+      setComments("")
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center"><Atom className="mr-2 h-5 w-5" /> AI Discovery Agent</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          <Input
+            placeholder="Type a molecule name (e.g., Aspirin) or SMILES string"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <Button onClick={runAll} disabled={busy || !query}>
+            {busy ? "Analyzing..." : "Analyze"}
+          </Button>
+        </div>
+
+        {identified && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Identified Molecule</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm space-y-1">
+                  <div><span className="text-gray-500">Name:</span> {identified.name || "Unknown"}</div>
+                  {identified.formula && (<div><span className="text-gray-500">Formula:</span> {identified.formula}</div>)}
+                  {identified.smiles && (
+                    <div className="break-all"><span className="text-gray-500">SMILES:</span> <span className="font-mono text-xs">{identified.smiles}</span></div>
+                  )}
+                  <div className="text-xs text-gray-500">Source: {identified.source}</div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {interactions && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center"><Dna className="h-4 w-4 mr-2" />Predicted Protein Interactions</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm">
+                    {interactions.map((i, idx) => (
+                      <div key={idx} className="flex justify-between border-b py-1">
+                        <div>{i.protein}</div>
+                        <div className="text-right text-xs">
+                          <div>Affinity: {i.bindingAffinity} kcal/mol</div>
+                          <div>Prob: {i.probability}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {toxicity && (
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center"><ShieldAlert className="h-4 w-4 mr-2" />Toxicity Assessment</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm space-y-1">
+                    <div>hERG Risk: {toxicity.hergRisk}</div>
+                    <div>LD50 (rat, oral): {toxicity.ld50RatOral} mg/kg</div>
+                    <div>Lipinski violations: {toxicity.lipinski.ruleOfFiveViolations}</div>
+                    <div>Soluble: {toxicity.lipinski.soluble ? "Yes" : "No"}, Permeable: {toxicity.lipinski.permeable ? "Yes" : "No"}</div>
+                    {toxicity.alerts?.length ? <div>Alerts: {toxicity.alerts.join(", ")}</div> : null}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {synthesis && (
+              <Card className="md:col-span-1">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center"><Wrench className="h-4 w-4 mr-2" />Synthesis Plan</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm space-y-2">
+                    {synthesis.route.map((s: any) => (
+                      <div key={s.step} className="border rounded p-2">
+                        <div className="font-medium">Step {s.step}: {s.action}</div>
+                        <div className="text-xs text-gray-500">{s.detail}</div>
+                        {synthesis.conditions?.find((c: any) => c.step === s.step) && (
+                          <div className="mt-1 text-xs">
+                            {(() => { const c = synthesis.conditions.find((c: any) => c.step === s.step); return `Reagent: ${c.reagent}, Solvent: ${c.solvent}, Temp: ${c.tempC}°C, Time: ${c.timeH}h` })()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {explain && (
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center"><MessageSquare className="h-4 w-4 mr-2" />Why these predictions?</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm space-y-2">
+                    <div>{explain.text}</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      {explain.features.map((f: any, i: number) => (
+                        <div key={i} className="border rounded p-2 text-xs flex justify-between">
+                          <span>{f.feature}</span>
+                          <span className="font-mono">{Math.round(f.importance * 100)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {identified && (
+          <div className="border rounded p-3 space-y-2">
+            <div className="text-sm font-medium">Was this helpful?</div>
+            <div className="flex items-center gap-2">
+              <Select value={String(rating)} onValueChange={(v) => setRating(Number(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Rating" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[1,2,3,4,5].map((r) => <SelectItem key={r} value={String(r)}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Textarea placeholder="Any feedback or corrections?" value={comments} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setComments(e.target.value)} />
+              <Button variant="outline" onClick={sendFeedback} disabled={!comments && !rating}>Submit</Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -1,20 +1,26 @@
 import { createClient } from "@/lib/supabase/server"
 import ClimateVisualization from "@/components/visualization/climate-visualization"
 
+export const revalidate = 60
+
 export default async function ClimatePage() {
   const supabase = await createClient()
 
-  // Fetch comprehensive climate data
-  const { data: climateData } = await supabase
-    .from("climate_data")
-    .select("*")
-    .order("recorded_at", { ascending: false })
-    .limit(500)
+  const [climateRes, statsRes] = await Promise.all([
+    supabase
+      .from("climate_data")
+      .select("id,location,temperature,humidity,precipitation,wind_speed,recorded_at")
+      .order("recorded_at", { ascending: false })
+      .limit(500),
 
-  // Get location-based statistics
-  const { data: locationStats } = await supabase
-    .from("climate_data")
-    .select("location, temperature, humidity, precipitation, wind_speed")
+    supabase
+      .from("climate_data")
+      .select("location, temperature, humidity, precipitation, wind_speed")
+      .limit(5000),
+  ])
+
+  const climateData = climateRes.data || []
+  const locationStats = statsRes.data || []
 
   return (
     <div className="space-y-6">
@@ -23,7 +29,7 @@ export default async function ClimatePage() {
         <p className="text-gray-600">Environmental monitoring and climate pattern analysis</p>
       </div>
 
-      <ClimateVisualization climateData={climateData || []} locationStats={locationStats || []} />
+  <ClimateVisualization climateData={climateData} locationStats={locationStats} />
     </div>
   )
 }
