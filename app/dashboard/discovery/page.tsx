@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import DrugDiscoveryDashboard from "@/components/discovery/drug-discovery-dashboard"
 
 export default async function DiscoveryPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Fetch molecules with related data
   const { data: molecules } = await supabase

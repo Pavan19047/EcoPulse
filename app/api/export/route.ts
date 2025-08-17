@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const dataType = searchParams.get("type")
   const format = searchParams.get("format") || "json"
 
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     let data

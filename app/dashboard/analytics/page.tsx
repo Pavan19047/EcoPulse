@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import AnalyticsDashboard from "@/components/visualization/analytics-dashboard"
 
 export default async function AnalyticsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Fetch comprehensive analytics data
   const { data: forecasts } = await supabase.from("disease_forecasts").select("*")

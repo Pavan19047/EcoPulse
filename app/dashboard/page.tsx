@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import DashboardOverview from "@/components/dashboard/dashboard-overview"
 
 export default async function DashboardPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

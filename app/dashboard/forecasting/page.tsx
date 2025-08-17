@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import ForecastingDashboard from "@/components/forecasting/forecasting-dashboard"
 
 export default async function ForecastingPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Fetch disease forecasts with related data
   const { data: forecasts } = await supabase

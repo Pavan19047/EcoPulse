@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { format } from "date-fns"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -229,7 +230,7 @@ export default function AlertsSystem({ alerts, criticalForecasts }: AlertsSystem
                             <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
                               <div className="flex items-center">
                                 <Clock className="mr-1 h-3 w-3" />
-                                {new Date(alert.created_at).toLocaleString()}
+                                {format(new Date(alert.created_at), "yyyy-MM-dd HH:mm:ss")}
                               </div>
                               {alert.location && (
                                 <div className="flex items-center">
@@ -290,7 +291,7 @@ export default function AlertsSystem({ alerts, criticalForecasts }: AlertsSystem
                         </div>
                         <div className="flex items-center">
                           <Clock className="mr-1 h-3 w-3" />
-                          {new Date(alert.created_at).toLocaleString()}
+                          {format(new Date(alert.created_at), "yyyy-MM-dd HH:mm:ss")}
                         </div>
                       </div>
                       <Button variant="outline" size="sm">

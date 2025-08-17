@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import AlertsSystem from "@/components/visualization/alerts-system"
 
 export default async function AlertsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()

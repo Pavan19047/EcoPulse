@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import GlobalRiskMap from "@/components/visualization/global-risk-map"
 
 export default async function MapPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Fetch forecast data for map visualization
   const { data: forecasts } = await supabase

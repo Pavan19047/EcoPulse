@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import ClimateVisualization from "@/components/visualization/climate-visualization"
 
 export default async function ClimatePage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Fetch comprehensive climate data
   const { data: climateData } = await supabase
