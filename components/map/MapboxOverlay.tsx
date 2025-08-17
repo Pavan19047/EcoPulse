@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Marker, Popup } from "react-map-gl/mapbox";
+import { Marker, Popup } from "react-map-gl/maplibre";
 import { getRiskColor } from "@/hooks/mapboxUtils";
 
 type Forecast = {

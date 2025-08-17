@@ -1,18 +1,18 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import "mapbox-gl/dist/mapbox-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { useSupabaseForecasts } from "@/hooks/useSupabaseForecasts";
 import { MapboxOverlay } from "@/components/map/MapboxOverlay";
 import { Download } from "lucide-react";
 
-const ReactMapGL = dynamic(() => import("react-map-gl/mapbox").then((m) => m.default), { ssr: false });
+const ReactMapGL = dynamic(() => import("react-map-gl/maplibre").then((m) => m.default), { ssr: false });
 
 export default function GlobalMapPage() {
   const { forecasts, loading } = useSupabaseForecasts();
-  const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN as string | undefined;
+  const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY as string | undefined;
   const [viewport, setViewport] = useState({
     latitude: 20,
     longitude: 0,
@@ -31,13 +31,13 @@ export default function GlobalMapPage() {
     }
   };
 
-  if (!mapboxToken) {
+  if (!maptilerKey) {
     return (
       <div className="w-full h-screen flex items-center justify-center p-6">
         <div className="max-w-xl text-center space-y-3">
-          <h1 className="text-2xl font-semibold">Map requires a Mapbox token</h1>
+          <h1 className="text-2xl font-semibold">Map requires a MapTiler API key</h1>
           <p className="text-gray-600">
-            Set NEXT_PUBLIC_MAPBOX_TOKEN in your .env.local and restart the dev server to enable the global map.
+            Set NEXT_PUBLIC_MAPTILER_KEY in your .env.local and restart the dev server to enable the global map.
           </p>
           <p className="text-sm text-gray-500">Path: .env.local</p>
         </div>
@@ -66,9 +66,8 @@ export default function GlobalMapPage() {
         </Button>
       </div>
       <ReactMapGL
-        mapboxAccessToken={mapboxToken}
         initialViewState={viewport}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapStyle={`https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`}
         style={{ width: "100vw", height: "100vh" }}
         onMove={(evt: any) => setViewport(evt.viewState)}
       >
